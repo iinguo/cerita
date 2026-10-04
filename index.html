@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>故事工坊 Story Workshop</title>
+<style>
+:root{--bg:#f3f6f4;--card:#fff;--ink:#1f2d2a;--mute:#5d6f6a;--line:#d5dfdb;--pri:#1f6f64;--pri-ink:#fff;--acc:#f2b84b;--accbg:#fff3d6;--q:#e8f1ee;--bad:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#13201d;--card:#1b2b28;--ink:#e8f1ee;--mute:#9bb0aa;--line:#2f4540;--pri:#4fb3a4;--pri-ink:#0b1815;--accbg:#3a3015;--q:#223632;--bad:#ff8a80}}
+:root[data-theme="dark"]{--bg:#13201d;--card:#1b2b28;--ink:#e8f1ee;--mute:#9bb0aa;--line:#2f4540;--pri:#4fb3a4;--pri-ink:#0b1815;--accbg:#3a3015;--q:#223632;--bad:#ff8a80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.6 "PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif}
+h1,h2,h3{font-family:"Noto Serif SC","Songti SC","SimSun",Georgia,serif;line-height:1.25;margin:0 0 8px}
+.wrap{max-width:900px;margin:0 auto;padding:18px 14px 60px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+header h1{font-size:1.6rem;margin:0}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;font-weight:600}
+button:hover{border-color:var(--pri)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button.p{background:var(--pri);color:var(--pri-ink);border-color:var(--pri)}
+button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+label{display:block;font-weight:700;margin:12px 0 5px}
+.hint{color:var(--mute);font-size:.9rem;margin:0 0 6px}
+input,textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:9px 12px}
+textarea{resize:vertical}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row>div{flex:1;min-width:140px}
+.task{background:var(--accbg);border-left:6px solid var(--acc);border-radius:10px;padding:10px 14px}
+.qq{font-size:1.35rem;margin:6px 0 12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chip{border-radius:999px;padding:5px 13px;border-color:var(--pri)}
+.chip.used{background:var(--pri);color:var(--pri-ink)}
+.chip small{opacity:.8;margin-left:4px;font-weight:400}
+.st{border-style:dashed}
+.prog{height:8px;background:var(--q);border-radius:99px;overflow:hidden;margin-bottom:12px}
+.prog i{display:block;height:100%;background:var(--pri)}
+#ta{min-height:200px;font-size:1.1rem;line-height:1.8}
+.stat{color:var(--mute);font-size:.9rem}
+.hide{display:none}.en{pointer-events:none;display:block;font-size:.75em;font-weight:400;opacity:.78;line-height:1.3}button .en,.chip .en,.pill .en,#nav .en{display:inline;margin-left:5px}.err{color:var(--bad);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+.wrapx{overflow-x:auto}
+.step{border:1.5px dashed var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.pill{border-radius:99px;padding:2px 10px;font-size:.85rem;background:var(--q)}
+.pill.ok{background:var(--pri);color:var(--pri-ink)}
+.ans{text-indent:2em;margin:0 0 12px;white-space:pre-wrap;line-height:1.8}
+.ql{display:block;color:var(--mute);font-size:.85rem}
+@media print{body *{visibility:hidden}#out,#out *{visibility:visible}#out{position:absolute;left:0;top:0;width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>故事工坊 <small class="en" style="display:inline;margin-left:6px">Story Workshop</small></h1><nav id="nav" class="row" style="gap:6px"></nav></header>
+<main id="app"><p class="hint">加载中… Loading…</p></main>
+</div>
+<script>
+const $=s=>document.querySelector(s), app=$("#app");
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const B=(z,e)=>`${z}<small class="en">${e}</small>`;
+const M=(z,e)=>z+" / "+e;
+const S={token:"",me:null,task:null,story:null,step:0,draft:null,dirty:false};
+const LD=`<p class="hint">加载中… Loading…</p>`;
+function count(t){const c=(t.match(/[\u3400-\u9fff]/g)||[]).length;const w=t.replace(/[\u3400-\u9fff]/g," ").trim().split(/\s+/).filter(Boolean).length;return c+w}
+const paras=a=>a.join("\n").split("\n").filter(s=>s.trim()).map(s=>`<p class="ans">${esc(s)}</p>`).join("");
+const clone=o=>JSON.parse(JSON.stringify(o));
+const parseV=t=>t.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.indexOf("=");return i<0?{w:l,m:""}:{w:l.slice(0,i).trim(),m:l.slice(i+1).trim()}});
+const vText=v=>(v||[]).map(x=>x.m?x.w+" = "+x.m:x.w).join("\n");
+function dlg(msg,cancel){return new Promise(r=>{const d=document.createElement("div");d.style.cssText="position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:16px;z-index:9";
+  d.innerHTML=`<div class="card" style="max-width:380px;margin:0"><p>${esc(msg)}</p><div class="row" style="gap:8px">${cancel?`<button id="dn">${B("取消","Cancel")}</button>`:""}<button class="p" id="dy">${B("确定","OK")}</button></div></div>`;document.body.append(d);
+  d.querySelector("#dy").onclick=()=>{d.remove();r(true)};const n=d.querySelector("#dn");if(n)n.onclick=()=>{d.remove();r(false)}})}
+
+/* ---------- backend call (Google Apps Script web app) ---------- */
+const API_URL="PASTE_YOUR_APPS_SCRIPT_URL_HERE";   // <- ganti dengan URL /exec dari Apps Script
+const rpc=async(m,a={})=>{
+  if(API_URL.indexOf("https://script.google.com/")!==0)throw new Error(M("尚未设置后端网址（API_URL）","Backend URL (API_URL) is not set"));
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),30000);let r;
+  try{
+    const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({m,token:S.token,a}),signal:ctl.signal});
+    r=await res.json();
+  }catch(e){throw new Error(M("无法连接服务器，请检查网络后重试。","Cannot reach the server. Check your connection and try again."))}
+  finally{clearTimeout(tm)}
+  if(r&&r.error){
+    if(String(r.error).indexOf("登录已过期")===0){S.me=null;S.token="";S.dirty=false;try{sessionStorage.removeItem("tk")}catch(e){}
+      setTimeout(()=>vAuth("in").then(()=>{$("#msg").textContent=r.error}),0)}
+    throw new Error(r.error)}
+  return r;
+};
+const fail=e=>{app.innerHTML=`<div class="card"><p class="err">${esc(e.message)}</p></div>`};
+
+/* ---------- navigation ---------- */
+function nav(cur){
+  const g=S.me&&S.me.role==="guru";
+  const items=g?[["tugas",B("作业","Assignments")],["hasil",B("成果","Results")],["akun",B("账号","Accounts")]]:(S.me?[["tasks",B("我的作业","My assignments")]]:[]);
+  $("#nav").innerHTML=items.map(([k,l])=>`<button data-k="${k}" class="${k===cur?"on":""}">${l}</button>`).join("")+(S.me?`<button data-k="out">${B("退出","Log out")} (${esc(S.me.id)})</button>`:"");
+  $("#nav").onclick=async e=>{const b=e.target.closest("button"),k=b&&b.dataset.k;if(!k)return;
+    if(S.dirty&&!(await dlg(M("有未保存的内容，确定离开吗？","You have unsaved changes. Leave anyway?"),1)))return;
+    S.dirty=false;go(k)};
+}
+function go(v){app.oninput=null;app.onclick=null;app.onkeydown=null;
+  if(v==="out"){rpc("logout").catch(()=>{});S.me=null;S.token="";try{sessionStorage.removeItem("tk")}catch(e){}return vAuth()}
+  nav(v);app.innerHTML=LD;
+  Promise.resolve(({akun:vAkun,tugas:vTugas,hasil:vHasil,tasks:vTasks,auth:vAuth})[v]()).catch(fail)}
+
+/* ---------- TEACHER: assignments ---------- */
+const newStep=()=>({q:"",v:"",s:""});
+async function vTugas(edit){
+  const tasks=await rpc("listTasks");
+  const d=S.draft=edit||{code:"",title:"",instr:"",steps:[newStep()]};
+  const draw=()=>{
+    app.innerHTML=`<div class="card"><h2>${edit?B("修改作业","Edit assignment"):B("创建作业","Create assignment")}</h2>
+    <div class="row"><div><label for="code">${B("作业代码","Assignment code")}</label><input data-k="code" id="code" placeholder="CERITA-7A-1" value="${esc(d.code)}"></div></div>
+    <label for="ti">${B("标题","Title")}</label><input data-k="title" id="ti" value="${esc(d.title)}">
+    <label for="in">${B("给学生的说明","Instructions for students")}</label><textarea data-k="instr" id="in" rows="2">${esc(d.instr)}</textarea>
+    <h3 style="margin-top:18px">${B("写作步骤","Writing steps")}</h3><p class="hint">${B("每一步：一个问题、这一步的词汇、句子开头（可选）。","Each step: one question, its vocabulary, and an optional sentence starter.")}</p>
+    ${d.steps.map((s,i)=>`<div class="step"><b>${B("第"+(i+1)+"步","Step "+(i+1))}</b> <button data-del="${i}" style="float:right;color:var(--bad)">${B("删除","Delete")}</button>
+      <label>${B("引导问题","Guiding question")}</label><input data-i="${i}" data-k="q" value="${esc(s.q)}">
+      <label>${B("词汇（每行一个：词 = 意思）","Vocabulary (one per line: word = meaning)")}</label><textarea data-i="${i}" data-k="v" rows="3">${esc(s.v)}</textarea>
+      <label>${B("句子开头（可选）","Sentence starter (optional)")}</label><input data-i="${i}" data-k="s" value="${esc(s.s)}"></div>`).join("")}
+    <p><button id="add">+ ${B("添加步骤","Add step")}</button></p>
+    <p><button class="p" id="sv">${B("保存作业","Save assignment")}</button> <span id="msg" class="stat"></span></p></div>
+    <div class="card"><h2>${B("已保存的作业","Saved assignments")}</h2>${tasks.map(t=>`<p><b>${esc(t.id)}</b> · ${esc(t.title)} <button data-ed="${esc(t.id)}">${B("修改","Edit")}</button></p>`).join("")||`<p class="hint">${B("还没有作业。","No assignments yet.")}</p>`}</div>`;
+  };
+  draw();
+  app.oninput=e=>{const t=e.target,k=t.dataset.k;if(!k)return;if(t.dataset.i!==undefined)d.steps[+t.dataset.i][k]=t.value;else d[k]=t.value};
+  app.onclick=async e=>{const t=e.target.closest("button");if(!t)return;
+    if(t.id==="add"){d.steps.push(newStep());draw()}
+    else if(t.dataset.del!==undefined){d.steps.splice(+t.dataset.del,1);if(!d.steps.length)d.steps=[newStep()];draw()}
+    else if(t.dataset.ed){const x=tasks.find(z=>z.id===t.dataset.ed);vTugas({code:x.id,title:x.title,instr:x.instr||"",steps:x.steps.map(s=>({q:s.q,v:vText(s.vocab),s:s.st||""}))})}
+    else if(t.id==="sv"){
+      t.disabled=true;$("#msg").textContent=M("保存中…","Saving…");
+      try{await rpc("saveTask",{code:d.code,title:d.title,instr:d.instr,steps:d.steps.map(s=>({q:s.q,vocab:parseV(s.v),st:s.s}))});go("tugas")}
+      catch(err){t.disabled=false;$("#msg").textContent=err.message}}};
+}
+
+/* ---------- TEACHER: results ---------- */
+async function vHasil(){
+  const tasks=await rpc("listTasks");
+  app.innerHTML=`<div class="card"><label for="pick" style="margin-top:0">${B("选择作业","Choose an assignment")}</label><select id="pick"><option value="">—</option>${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.id)} · ${esc(t.title)}</option>`).join("")}</select></div><div id="res"></div>`;
+  $("#pick").onchange=async e=>{
+    const t=tasks.find(x=>x.id===e.target.value);if(!t){$("#res").innerHTML="";return}
+    $("#res").innerHTML=LD;
+    let list;try{list=await rpc("listStories",{code:t.id})}catch(err){$("#res").innerHTML=`<p class="err">${esc(err.message)}</p>`;return}
+    $("#res").innerHTML=`<div class="card"><div class="wrapx"><table><tr><th>${B("姓名","Name")}</th><th>ID</th><th>${B("状态","Status")}</th><th>${B("字数","Words")}</th><th></th></tr>${list.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.sid)}</td><td><span class="pill ${x.status==="submitted"?"ok":""}">${x.status==="submitted"?B("已提交","Submitted"):B("写作中","Writing")}</span></td><td>${count((x.answers||[]).join(" "))}</td><td><button data-s="${esc(x.sid)}">${B("阅读","Read")}</button></td></tr>`).join("")||`<tr><td colspan="5" class="hint">${B("还没有学生开始。","No students have started yet.")}</td></tr>`}</table></div></div><div id="read"></div>`;
+    app.onclick=ev=>{const b=ev.target.closest("button"),id=b&&b.dataset.s;if(id)read(list.find(z=>z.sid===id))};
+  };
+  function read(x){
+    $("#read").innerHTML=`<div class="card"><h2>${esc(x.name)} · ${esc(x.sid)}</h2>${paras(x.answers||[])||`<p class="hint">${B("还没有内容。","Nothing written yet.")}</p>`}
+    <p class="hint">${B("评语请在 Google Drive 中打开对应的文档添加。","To leave comments, open the matching Google Doc in Drive.")}</p></div>`;
+    $("#read").scrollIntoView({behavior:"smooth"});
+  }
+}
+
+/* ---------- TEACHER: accounts ---------- */
+async function vAkun(){
+  const us=await rpc("listUsers");
+  app.innerHTML=`<div class="card"><h2>${B("账号","Accounts")} (${us.length})</h2><p class="hint">${B("重置会生成临时密码，账号主人登录时必须改密码。若有人误注册为老师，请删除该账号。","Reset creates a temporary password; the owner must change it on login. Delete accounts that signed up as teacher by mistake.")}</p><div class="wrapx"><table><tr><th>${B("姓名","Name")}</th><th>ID</th><th>${B("身份","Role")}</th><th></th></tr>${us.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.id)}</td><td><span class="pill">${u.role==="guru"?B("老师","Teacher"):B("学生","Student")}</span></td><td>${u.id===S.me.id?B("（你）","(you)"):`<button data-r="${esc(u.id)}">${B("重置密码","Reset")}</button> <button data-d="${esc(u.id)}" style="color:var(--bad)">${B("删除","Delete")}</button>`}</td></tr>`).join("")}</table></div></div>`;
+  app.onclick=async e=>{const b=e.target.closest("button");if(!b)return;const r=b.dataset.r,d=b.dataset.d;
+    try{
+      if(r){const x=await rpc("resetPw",{id:r});await dlg(`临时密码 Temporary password (${r}): ${x.pw}`)}
+      if(d&&await dlg(`删除账号 Delete account ${d}?`,1)){await rpc("deleteUser",{id:d});go("akun")}
+    }catch(err){await dlg(err.message)}};
+}
+
+/* ---------- AUTH ---------- */
+async function vAuth(mode="in"){
+  S.me=null;nav("");app.oninput=null;app.onclick=null;
+  let role="siswa";const up=mode==="up";
+  app.innerHTML=`<div class="card" style="max-width:440px;margin:auto"><div class="row" style="gap:6px"><button id="m-in" class="${up?"":"on"}">${B("登录","Log in")}</button><button id="m-up" class="${up?"on":""}">${B("注册","Sign up")}</button></div>
+  ${up?`<label>${B("注册身份","Sign up as")}</label><div class="row" style="gap:6px"><button data-r="siswa" class="on">${B("学生","Student")}</button><button data-r="guru">${B("老师","Teacher")}</button></div>
+  <label for="nm">${B("姓名","Name")}</label><input id="nm" autocomplete="name">
+  <label for="id">${B("ID（自己设定）","ID (choose your own)")}</label><p class="hint">${B("字母、数字或 -，不能与他人重复。","Letters, numbers, or -. Must be unique.")}</p><input id="id" autocomplete="username" placeholder="e.g. li07">
+  <label for="pw">${B("密码（至少6位）","Password (min. 6 characters)")}</label><input id="pw" type="password" autocomplete="new-password">
+  <div id="gc" class="hide"><label for="gk">${B("教师代码","Teacher code")}</label><input id="gk" type="password"></div>`
+  :`<label for="id">ID</label><input id="id" autocomplete="username"><label for="pw">${B("密码","Password")}</label><input id="pw" type="password" autocomplete="current-password">`}
+  <p><button class="p" id="go">${up?B("注册","Sign up"):B("登录","Log in")}</button> <span id="msg" class="err"></span></p></div>`;
+  $("#m-in").onclick=()=>vAuth("in");$("#m-up").onclick=()=>vAuth("up");
+  if(up)app.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{role=b.dataset.r;app.querySelectorAll("[data-r]").forEach(x=>x.classList.toggle("on",x===b));$("#gc").classList.toggle("hide",role!=="guru")});
+  const run=async()=>{
+    const btn=$("#go"),msg=x=>{$("#msg").textContent=x};msg("");btn.disabled=true;msg("…");
+    try{
+      const r=up?await rpc("register",{id:$("#id").value,pw:$("#pw").value,name:$("#nm").value,role,code:role==="guru"?$("#gk").value:""})
+                :await rpc("login",{id:$("#id").value,pw:$("#pw").value});
+      start(r);
+    }catch(e){btn.disabled=false;msg(e.message)}};
+  $("#go").onclick=run;app.onkeydown=e=>{if(e.key==="Enter")run()};
+}
+function start(r){S.token=r.token;try{sessionStorage.setItem("tk",r.token)}catch(e){}
+  if(r.user.temp){S.me=r.user;return vNewPw(r.user)}enter(r.user)}
+function vNewPw(u){
+  nav("");
+  app.innerHTML=`<div class="card" style="max-width:440px;margin:auto"><h2>${B("设置新密码","Set a new password")}</h2><p class="hint">${B("临时密码只能用一次。","The temporary password works only once.")}</p><label for="p1">${B("新密码（至少6位）","New password (min. 6 characters)")}</label><input id="p1" type="password" autocomplete="new-password"><p><button class="p" id="sv2">${B("保存","Save")}</button> <span id="msg" class="err"></span></p></div>`;
+  $("#sv2").onclick=async()=>{$("#sv2").disabled=true;
+    try{const r=await rpc("changePw",{pw:$("#p1").value});enter(r.user)}catch(e){$("#sv2").disabled=false;$("#msg").textContent=e.message}};
+}
+function enter(u){S.me=u;if(u.role==="guru")go("tugas");else resume().catch(fail)}
+async function resume(){
+  app.oninput=null;app.onclick=null;app.onkeydown=null;nav("tasks");app.innerHTML=LD;
+  const r=await rpc("resume");
+  if(r.none)return go("tasks");
+  S.task=r.task;S.story=r.story;pad();S.step=Math.min(S.story.step||0,S.task.steps.length-1);S.dirty=false;vWrite();
+}
+function pad(){while(S.story.answers.length<S.task.steps.length)S.story.answers.push("")}
+
+/* ---------- STUDENT ---------- */
+async function vTasks(){
+  const rows=await rpc("myTasks");
+  app.innerHTML=`<div class="card"><h2>${B("你好，"+esc(S.me.name),"Hello, "+esc(S.me.name))}</h2>
+  ${rows.length?`<h3>${B("我的作业","Your assignments")}</h3>${rows.map(r=>`<p><button class="${r.sub?"":"p"}" data-c="${esc(r.code)}">${esc(r.title)}</button> <span class="pill ${r.sub?"ok":""}">${r.sub?B("已提交","Submitted"):B("继续写作","Continue writing")}</span></p>`).join("")}`:""}
+  <label for="kd">${rows.length?B("新作业？输入作业代码","New assignment? Enter the code"):B("输入老师给的作业代码","Enter the code from your teacher")}</label>
+  <div class="row"><div><input id="kd" placeholder="CERITA-7A-1"></div><button class="p" id="op" style="flex:0">${B("打开","Open")}</button></div><p id="msg" class="err"></p></div>`;
+  const open=async c=>{$("#msg").textContent="…";
+    try{const r=await rpc("openTask",{code:c});S.task=r.task;
+      S.story=r.story||{code:r.task.id,sid:S.me.id,name:S.me.name,answers:[],status:"draft",step:0};pad();
+      S.step=Math.min(S.story.step||0,S.task.steps.length-1);S.dirty=false;vWrite()}
+    catch(e){$("#msg").textContent=e.message}};
+  $("#op").onclick=()=>open($("#kd").value);
+  app.onclick=e=>{const b=e.target.closest("button"),c=b&&b.dataset.c;if(c)open(c)};
+}
+async function persist(status){
+  const bs=[...app.querySelectorAll("button:not(:disabled)")];bs.forEach(b=>b.disabled=true);
+  const sv=$("#sv");if(sv)sv.textContent=M("保存中…","Saving…");
+  try{const r=await rpc("saveStory",{code:S.task.id,answers:S.story.answers,step:S.step,status:status||""});S.story.status=r.status;S.dirty=false;return true}
+  catch(e){const x=$("#sv")||$("#cm");if(x)x.textContent=M("保存失败","Save failed")+": "+e.message;return false}
+  finally{bs.forEach(b=>{if(b.isConnected)b.disabled=false})}
+}
+function vWrite(){
+  const t=S.task,n=t.steps.length,s=t.steps[S.step],a=S.story.answers;
+  app.innerHTML=`<div class="card"><h2>${esc(t.title)}</h2><div class="task">${esc(t.instr)}</div></div>
+  <div class="card"><div class="prog"><i style="width:${(S.step+1)/n*100}%"></i></div><span class="stat">${B("第 "+(S.step+1)+" 步，共 "+n+" 步","Step "+(S.step+1)+" of "+n)}</span>
+  <h3 class="qq">${esc(s.q)}</h3>
+  ${s.vocab.length?`<p class="hint">${B("这一步的词汇，点击即可使用。","Vocabulary for this step. Click to use it.")}</p>`:""}<div class="chips" id="vc"></div>
+  ${s.st?`<div class="chips"><button class="chip st" data-t="${esc(s.st)}">${esc(s.st)}</button></div>`:""}
+  <textarea id="ta" aria-label="你的作文 Your writing"></textarea><p class="stat"><span id="stat"></span> · <span id="sv"></span></p>
+  <div class="row" style="justify-content:space-between"><button id="pv" ${S.step?"":"disabled"}>${B("上一步","Back")}</button><button id="sv3">${B("保存","Save")}</button><button class="p" id="nx">${S.step===n-1?B("提交作文","Submit story"):B("下一步","Next")}</button></div></div>`;
+  const ta=$("#ta");ta.value=a[S.step];
+  s.vocab.forEach(v=>{const b=document.createElement("button");b.className="chip";b.dataset.w=v.w;b.textContent=v.w;if(v.m){const m=document.createElement("small");m.textContent=v.m;b.append(m)}$("#vc").append(b)});
+  const upd=()=>{a[S.step]=ta.value;$("#stat").textContent=count(ta.value)+" 字 words";const l=ta.value.toLowerCase();document.querySelectorAll("#vc .chip").forEach(c=>c.classList.toggle("used",l.includes(c.dataset.w.toLowerCase())))};
+  const dirty=()=>{S.dirty=true;$("#sv").textContent=M("尚未保存","Not saved yet")};
+  const ins=x=>{const p=ta.selectionStart;ta.setRangeText(x,p,ta.selectionEnd,"end");ta.focus();upd();dirty()};
+  ta.oninput=()=>{upd();dirty()};upd();
+  app.onclick=async e=>{const b=e.target.closest("button");if(!b||b.disabled)return;
+    if(b.dataset.w)return ins(b.dataset.w+" ");
+    if(b.dataset.t)return ins(b.dataset.t+" ");
+    if(b.id==="sv3"){if(await persist())vResult();return}
+    if(b.id==="pv"){S.step--;if(await persist())vWrite();else S.step++;return}
+    if(b.id==="nx"){
+      if(S.step<n-1){S.step++;if(await persist())vWrite();else S.step--}
+      else if(await dlg(M("现在提交作文吗？你随时可以继续修改。","Submit your story now? You can edit it any time."),1)){if(await persist("submitted"))vResult()}}};
+}
+function vResult(){
+  app.onclick=null;app.oninput=null;
+  const t=S.task,a=S.story.answers,sub=S.story.status==="submitted";
+  app.innerHTML=`<div class="card"><h2>${esc(t.title)}</h2><p><span class="pill ok">${sub?B("已提交给老师","Submitted to teacher"):B("已保存","Saved")}</span></p><div id="out">${paras(a)||`<p class="hint">${B("还没有内容。","Nothing written yet.")}</p>`}</div><p class="stat">${count(a.join(" "))} 字 words</p>
+  <div class="row" style="gap:8px"><button class="p" id="cp">${B("复制","Copy")}</button><button id="ct">${B("编辑","Edit")}</button>${sub?"":`<button id="ks">${B("提交给老师","Send to teacher")}</button>`}<button id="bk">${B("我的作业","My assignments")}</button></div><p class="stat" id="cm"></p></div>`;
+  $("#cp").onclick=async()=>{const x=a.join("\n").split("\n").filter(s=>s.trim()).join("\n");
+    try{await navigator.clipboard.writeText(x);$("#cm").textContent=M("已复制。","Copied.")}
+    catch(e){const r=document.createRange();r.selectNodeContents($("#out"));const g=getSelection();g.removeAllRanges();g.addRange(r);$("#cm").textContent=M("文字已选中，请按 Ctrl+C（手机上长按）复制。","Text selected. Press Ctrl+C (or long-press on mobile) to copy.")}};
+  $("#bk").onclick=()=>go("tasks");
+  $("#ct").onclick=vWrite;
+  if(!sub)$("#ks").onclick=async()=>{if(await dlg(M("提交给老师吗？你随时可以继续修改。","Send to your teacher? You can edit it any time."),1)){if(await persist("submitted"))vResult()}};
+}
+window.addEventListener("beforeunload",e=>{if(S.dirty){e.preventDefault();e.returnValue=""}});
+
+/* ---------- start ---------- */
+(async()=>{
+  if(API_URL.indexOf("https://script.google.com/")!==0){app.innerHTML=`<div class="card"><h2>${B("尚未设置后端网址","Backend URL not set")}</h2><p>${B("请在 index.html 顶部把 API_URL 改成 Apps Script 的 /exec 网址。","Edit API_URL at the top of the script in index.html and paste your Apps Script /exec URL.")}</p></div>`;return}
+  let tk="";try{tk=sessionStorage.getItem("tk")||""}catch(e){}
+  if(tk){S.token=tk;try{const r=await rpc("me");if(r.user.temp){S.me=r.user;return vNewPw(r.user)}return enter(r.user)}catch(e){S.token=""}}
+  go("auth");
+})();
+</script>
+</body>
+</html>
