@@ -72,7 +72,7 @@ function dlg(msg,cancel){return new Promise(r=>{const d=document.createElement("
   d.querySelector("#dy").onclick=()=>{d.remove();r(true)};const n=d.querySelector("#dn");if(n)n.onclick=()=>{d.remove();r(false)}})}
 
 /* ---------- backend call (Google Apps Script web app) ---------- */
-const API_URL="PASTE_YOUR_APPS_SCRIPT_URL_HERE";   // <- ganti dengan URL /exec dari Apps Script
+const API_URL="https://script.google.com/macros/s/AKfycby_dZ8cWgLDTzd4zJ-KQZjgWgpHvujgB2grlPLs_cq0_0knQk2fzcezClQv3LD4Mr7c/exec";   // <- ganti dengan URL /exec dari Apps Script
 const rpc=async(m,a={})=>{
   if(API_URL.indexOf("https://script.google.com/")!==0)throw new Error(M("尚未设置后端网址（API_URL）","Backend URL (API_URL) is not set"));
   const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),30000);let r;
