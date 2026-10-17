@@ -64,6 +64,7 @@ const S={token:"",me:null,task:null,story:null,step:0,draft:null,dirty:false};
 const LD=`<p class="hint">加载中… Loading…</p>`;
 function count(t){const c=(t.match(/[\u3400-\u9fff]/g)||[]).length;const w=t.replace(/[\u3400-\u9fff]/g," ").trim().split(/\s+/).filter(Boolean).length;return c+w}
 const paras=a=>a.join("\n").split("\n").filter(s=>s.trim()).map(s=>`<p class="ans">${esc(s)}</p>`).join("");
+const fb=()=>{const s=S.story;return s&&s.reviewedAt?`<div class="task" style="margin:12px 0"><b>老师评语 <span style="font-weight:400">Teacher's feedback</span></b>${s.grade?`<p style="margin:4px 0">成绩 Grade: <b>${esc(s.grade)}</b></p>`:""}${s.comment?`<p class="ans" style="text-indent:0;margin:6px 0 0">${esc(s.comment)}</p>`:""}</div>`:""};
 const clone=o=>JSON.parse(JSON.stringify(o));
 const parseV=t=>t.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.indexOf("=");return i<0?{w:l,m:""}:{w:l.slice(0,i).trim(),m:l.slice(i+1).trim()}});
 const vText=v=>(v||[]).map(x=>x.m?x.w+" = "+x.m:x.w).join("\n");
@@ -72,7 +73,7 @@ function dlg(msg,cancel){return new Promise(r=>{const d=document.createElement("
   d.querySelector("#dy").onclick=()=>{d.remove();r(true)};const n=d.querySelector("#dn");if(n)n.onclick=()=>{d.remove();r(false)}})}
 
 /* ---------- backend call (Google Apps Script web app) ---------- */
-const API_URL="https://script.google.com/macros/s/AKfycby_dZ8cWgLDTzd4zJ-KQZjgWgpHvujgB2grlPLs_cq0_0knQk2fzcezClQv3LD4Mr7c/exec";   // <- ganti dengan URL /exec dari Apps Script
+const API_URL="PASTE_YOUR_APPS_SCRIPT_URL_HERE";   // <- ganti dengan URL /exec dari Apps Script
 const rpc=async(m,a={})=>{
   if(API_URL.indexOf("https://script.google.com/")!==0)throw new Error(M("尚未设置后端网址（API_URL）","Backend URL (API_URL) is not set"));
   const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),30000);let r;
@@ -109,7 +110,8 @@ async function vTugas(edit){
   const tasks=await rpc("listTasks");
   const d=S.draft=edit||{code:"",title:"",instr:"",steps:[newStep()]};
   const draw=()=>{
-    app.innerHTML=`<div class="card"><h2>${edit?B("修改作业","Edit assignment"):B("创建作业","Create assignment")}</h2>
+    const nt=S.note;S.note=null;
+    app.innerHTML=(nt&&nt.folderUrl?`<div class="task" style="margin-bottom:14px">${B("已保存。作业文件夹：","Saved. Assignment folder: ")}<a href="${esc(nt.folderUrl)}" target="_blank" rel="noopener">${esc(nt.folderName)}</a></div>`:"")+`<div class="card"><h2>${edit?B("修改作业","Edit assignment"):B("创建作业","Create assignment")}</h2>
     <div class="row"><div><label for="code">${B("作业代码","Assignment code")}</label><input data-k="code" id="code" placeholder="CERITA-7A-1" value="${esc(d.code)}"></div></div>
     <label for="ti">${B("标题","Title")}</label><input data-k="title" id="ti" value="${esc(d.title)}">
     <label for="in">${B("给学生的说明","Instructions for students")}</label><textarea data-k="instr" id="in" rows="2">${esc(d.instr)}</textarea>
@@ -130,11 +132,11 @@ async function vTugas(edit){
     else if(t.dataset.ed){const x=tasks.find(z=>z.id===t.dataset.ed);vTugas({code:x.id,title:x.title,instr:x.instr||"",steps:x.steps.map(s=>({q:s.q,v:vText(s.vocab),s:s.st||""}))})}
     else if(t.id==="sv"){
       t.disabled=true;$("#msg").textContent=M("保存中…","Saving…");
-      try{await rpc("saveTask",{code:d.code,title:d.title,instr:d.instr,steps:d.steps.map(s=>({q:s.q,vocab:parseV(s.v),st:s.s}))});go("tugas")}
+      try{S.note=await rpc("saveTask",{code:d.code,title:d.title,instr:d.instr,steps:d.steps.map(s=>({q:s.q,vocab:parseV(s.v),st:s.s}))});go("tugas")}
       catch(err){t.disabled=false;$("#msg").textContent=err.message}}};
 }
 
-/* ---------- TEACHER: results ---------- */
+/* ---------- TEACHER: results & review ---------- */
 async function vHasil(){
   const tasks=await rpc("listTasks");
   app.innerHTML=`<div class="card"><label for="pick" style="margin-top:0">${B("选择作业","Choose an assignment")}</label><select id="pick"><option value="">—</option>${tasks.map(t=>`<option value="${esc(t.id)}">${esc(t.id)} · ${esc(t.title)}</option>`).join("")}</select></div><div id="res"></div>`;
@@ -142,12 +144,30 @@ async function vHasil(){
     const t=tasks.find(x=>x.id===e.target.value);if(!t){$("#res").innerHTML="";return}
     $("#res").innerHTML=LD;
     let list;try{list=await rpc("listStories",{code:t.id})}catch(err){$("#res").innerHTML=`<p class="err">${esc(err.message)}</p>`;return}
-    $("#res").innerHTML=`<div class="card"><div class="wrapx"><table><tr><th>${B("姓名","Name")}</th><th>ID</th><th>${B("状态","Status")}</th><th>${B("字数","Words")}</th><th></th></tr>${list.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.sid)}</td><td><span class="pill ${x.status==="submitted"?"ok":""}">${x.status==="submitted"?B("已提交","Submitted"):B("写作中","Writing")}</span></td><td>${count((x.answers||[]).join(" "))}</td><td><button data-s="${esc(x.sid)}">${B("阅读","Read")}</button></td></tr>`).join("")||`<tr><td colspan="5" class="hint">${B("还没有学生开始。","No students have started yet.")}</td></tr>`}</table></div></div><div id="read"></div>`;
-    app.onclick=ev=>{const b=ev.target.closest("button"),id=b&&b.dataset.s;if(id)read(list.find(z=>z.sid===id))};
+    $("#res").innerHTML=`<div id="tbl"></div><div id="read"></div>`;
+    const rv=x=>!x.reviewedAt?B("未批改","Not reviewed"):(x.updated>x.reviewedAt?B("修改后待复评","Edited since review"):B("已批改","Reviewed"));
+    const draw=()=>{$("#tbl").innerHTML=`<div class="card"><div class="wrapx"><table><tr><th>${B("姓名","Name")}</th><th>ID</th><th>${B("状态","Status")}</th><th>${B("字数","Words")}</th><th>${B("批改","Review")}</th><th>${B("成绩","Grade")}</th><th></th></tr>${list.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.sid)}</td><td><span class="pill ${x.status==="submitted"?"ok":""}">${x.status==="submitted"?B("已提交","Submitted"):B("写作中","Writing")}</span></td><td>${count((x.answers||[]).join(" "))}</td><td><span class="pill ${x.reviewedAt&&x.updated<=x.reviewedAt?"ok":""}">${rv(x)}</span></td><td>${esc(x.grade||"")}</td><td><button data-s="${esc(x.sid)}">${B("阅读","Read")}</button></td></tr>`).join("")||`<tr><td colspan="7" class="hint">${B("还没有学生开始。","No students have started yet.")}</td></tr>`}</table></div></div>`};
+    draw();
+    app.onclick=ev=>{const b=ev.target.closest("button"),id=b&&b.dataset.s;if(id)read(list.find(z=>z.sid===id),draw,t)};
   };
-  function read(x){
-    $("#read").innerHTML=`<div class="card"><h2>${esc(x.name)} · ${esc(x.sid)}</h2>${paras(x.answers||[])||`<p class="hint">${B("还没有内容。","Nothing written yet.")}</p>`}
-    <p class="hint">${B("评语请在 Google Drive 中打开对应的文档添加。","To leave comments, open the matching Google Doc in Drive.")}</p></div>`;
+  function read(x,draw,t){
+    $("#read").innerHTML=`<div class="card"><h2>${esc(x.name)} · ${esc(x.sid)}</h2>${paras(x.answers||[])||`<p class="hint">${B("还没有内容。","Nothing written yet.")}</p>`}</div>
+    <div class="card"><h3>${B("批改","Review")}</h3>
+    <label for="gr" style="margin-top:0">${B("成绩","Grade")}</label><input id="gr" style="max-width:200px" placeholder="85 / A" value="${esc(x.grade||"")}">
+    <label for="cm">${B("评语","Comment")}</label><textarea id="cm" rows="4">${esc(x.comment||"")}</textarea>
+    <p><button class="p" id="rv">${B("保存批改","Save review")}</button> <span id="rm" class="stat"></span></p>
+    <p><button id="hist">${B("查看修改记录","Revision history")}</button></p><div id="hl"></div></div>`;
+    $("#read").onclick=async e=>{const b=e.target.closest("button");if(!b)return;
+      if(b.id==="rv"){b.disabled=true;$("#rm").textContent=M("保存中…","Saving…");
+        try{const r=await rpc("reviewStory",{code:t.id,sid:x.sid,grade:$("#gr").value,comment:$("#cm").value});
+          x.grade=$("#gr").value.trim();x.comment=$("#cm").value.trim();x.reviewedAt=r.reviewedAt;draw();$("#rm").textContent=M("已保存","Saved")}
+        catch(err){$("#rm").textContent=err.message}
+        b.disabled=false}
+      if(b.id==="hist"){b.disabled=true;$("#hl").innerHTML=LD;
+        try{const hs=await rpc("listRevisions",{code:t.id,sid:x.sid});
+          $("#hl").innerHTML=hs.length?hs.map(h=>`<details style="margin:6px 0"><summary>${esc(new Date(h.at).toLocaleString())} · ${count(h.answers.join(" "))} 字 words${h.status==="submitted"?" · 已提交 submitted":""}</summary>${paras(h.answers)}</details>`).join(""):`<p class="hint">${B("还没有记录（从下一次保存开始记录）。","No history yet (recording starts from the next save).")}</p>`}
+        catch(err){$("#hl").innerHTML=`<p class="err">${esc(err.message)}</p>`}
+        b.disabled=false}};
     $("#read").scrollIntoView({behavior:"smooth"});
   }
 }
@@ -207,7 +227,7 @@ function pad(){while(S.story.answers.length<S.task.steps.length)S.story.answers.
 async function vTasks(){
   const rows=await rpc("myTasks");
   app.innerHTML=`<div class="card"><h2>${B("你好，"+esc(S.me.name),"Hello, "+esc(S.me.name))}</h2>
-  ${rows.length?`<h3>${B("我的作业","Your assignments")}</h3>${rows.map(r=>`<p><button class="${r.sub?"":"p"}" data-c="${esc(r.code)}">${esc(r.title)}</button> <span class="pill ${r.sub?"ok":""}">${r.sub?B("已提交","Submitted"):B("继续写作","Continue writing")}</span></p>`).join("")}`:""}
+  ${rows.length?`<h3>${B("我的作业","Your assignments")}</h3>${rows.map(r=>`<p><button class="${r.sub?"":"p"}" data-c="${esc(r.code)}">${esc(r.title)}</button> <span class="pill ${r.sub?"ok":""}">${r.sub?B("已提交","Submitted"):B("继续写作","Continue writing")}</span>${r.rev?` <span class="pill ok">${B("已批改","Reviewed")}${r.grade?" · "+esc(r.grade):""}</span>`:""}</p>`).join("")}`:""}
   <label for="kd">${rows.length?B("新作业？输入作业代码","New assignment? Enter the code"):B("输入老师给的作业代码","Enter the code from your teacher")}</label>
   <div class="row"><div><input id="kd" placeholder="CERITA-7A-1"></div><button class="p" id="op" style="flex:0">${B("打开","Open")}</button></div><p id="msg" class="err"></p></div>`;
   const open=async c=>{$("#msg").textContent="…";
@@ -227,7 +247,7 @@ async function persist(status){
 }
 function vWrite(){
   const t=S.task,n=t.steps.length,s=t.steps[S.step],a=S.story.answers;
-  app.innerHTML=`<div class="card"><h2>${esc(t.title)}</h2><div class="task">${esc(t.instr)}</div></div>
+  app.innerHTML=`<div class="card"><h2>${esc(t.title)}</h2><div class="task">${esc(t.instr)}</div>${fb()}</div>
   <div class="card"><div class="prog"><i style="width:${(S.step+1)/n*100}%"></i></div><span class="stat">${B("第 "+(S.step+1)+" 步，共 "+n+" 步","Step "+(S.step+1)+" of "+n)}</span>
   <h3 class="qq">${esc(s.q)}</h3>
   ${s.vocab.length?`<p class="hint">${B("这一步的词汇，点击即可使用。","Vocabulary for this step. Click to use it.")}</p>`:""}<div class="chips" id="vc"></div>
@@ -252,7 +272,7 @@ function vWrite(){
 function vResult(){
   app.onclick=null;app.oninput=null;
   const t=S.task,a=S.story.answers,sub=S.story.status==="submitted";
-  app.innerHTML=`<div class="card"><h2>${esc(t.title)}</h2><p><span class="pill ok">${sub?B("已提交给老师","Submitted to teacher"):B("已保存","Saved")}</span></p><div id="out">${paras(a)||`<p class="hint">${B("还没有内容。","Nothing written yet.")}</p>`}</div><p class="stat">${count(a.join(" "))} 字 words</p>
+  app.innerHTML=`<div class="card"><h2>${esc(t.title)}</h2>${fb()}<p><span class="pill ok">${sub?B("已提交给老师","Submitted to teacher"):B("已保存","Saved")}</span></p><div id="out">${paras(a)||`<p class="hint">${B("还没有内容。","Nothing written yet.")}</p>`}</div><p class="stat">${count(a.join(" "))} 字 words</p>
   <div class="row" style="gap:8px"><button class="p" id="cp">${B("复制","Copy")}</button><button id="ct">${B("编辑","Edit")}</button>${sub?"":`<button id="ks">${B("提交给老师","Send to teacher")}</button>`}<button id="bk">${B("我的作业","My assignments")}</button></div><p class="stat" id="cm"></p></div>`;
   $("#cp").onclick=async()=>{const x=a.join("\n").split("\n").filter(s=>s.trim()).join("\n");
     try{await navigator.clipboard.writeText(x);$("#cm").textContent=M("已复制。","Copied.")}
